@@ -1,0 +1,91 @@
+/* Custom styles and animations */
+
+/* Ball Base Style */
+.lotto-ball {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1.25rem;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    box-shadow: inset -5px -5px 10px rgba(0,0,0,0.3), 0 0 10px rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Shine effect on ball */
+.lotto-ball::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 7px;
+    width: 10px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.4);
+    transform: rotate(-45deg);
+}
+
+/* Colors for specific ranges (Standard Lotto Colors) */
+.ball-range-1 { background: linear-gradient(135deg, #fbc400, #c79a00); } /* 1-10 */
+.ball-range-2 { background: linear-gradient(135deg, #69c, #4a7a9e); }    /* 11-20 */
+.ball-range-3 { background: linear-gradient(135deg, #ff7272, #c93434); } /* 21-30 */
+.ball-range-4 { background: linear-gradient(135deg, #aaa, #777); }       /* 31-40 */
+.ball-range-5 { background: linear-gradient(135deg, #b0d840, #8cb322); } /* 41-45 */
+
+/* Rolling Animation */
+@keyframes rollIn {
+    0% {
+        transform: translateX(-100px) rotate(-360deg);
+        opacity: 0;
+    }
+    60% {
+        transform: translateX(10px) rotate(20deg);
+        opacity: 1;
+    }
+    80% {
+        transform: translateX(-5px) rotate(-10deg);
+    }
+    100% {
+        transform: translateX(0) rotate(0);
+    }
+}
+
+/* Pop In Animation (Alternative) */
+@keyframes popIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    70% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animate-roll {
+    animation: rollIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-pop {
+    animation: popIn 0.4s ease-out forwards;
+}
+
+/* Scrollbar Styling */
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+    border-radius: 20px;
+}
