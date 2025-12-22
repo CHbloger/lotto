@@ -1,91 +1,112 @@
-/* Custom styles and animations */
+/* Enhanced Styles */
 
-/* Ball Base Style */
-.lotto-ball {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: bold;
-    font-size: 1.25rem;
-    color: #fff;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    box-shadow: inset -5px -5px 10px rgba(0,0,0,0.3), 0 0 10px rgba(0,0,0,0.2);
-    position: relative;
-    overflow: hidden;
-}
-
-/* Shine effect on ball */
-.lotto-ball::after {
-    content: '';
-    position: absolute;
-    top: 5px;
-    left: 7px;
-    width: 10px;
-    height: 5px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.4);
-    transform: rotate(-45deg);
-}
-
-/* Colors for specific ranges (Standard Lotto Colors) */
-.ball-range-1 { background: linear-gradient(135deg, #fbc400, #c79a00); } /* 1-10 */
-.ball-range-2 { background: linear-gradient(135deg, #69c, #4a7a9e); }    /* 11-20 */
-.ball-range-3 { background: linear-gradient(135deg, #ff7272, #c93434); } /* 21-30 */
-.ball-range-4 { background: linear-gradient(135deg, #aaa, #777); }       /* 31-40 */
-.ball-range-5 { background: linear-gradient(135deg, #b0d840, #8cb322); } /* 41-45 */
-
-/* Rolling Animation */
-@keyframes rollIn {
-    0% {
-        transform: translateX(-100px) rotate(-360deg);
-        opacity: 0;
-    }
-    60% {
-        transform: translateX(10px) rotate(20deg);
-        opacity: 1;
-    }
-    80% {
-        transform: translateX(-5px) rotate(-10deg);
-    }
-    100% {
-        transform: translateX(0) rotate(0);
-    }
-}
-
-/* Pop In Animation (Alternative) */
-@keyframes popIn {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-    70% {
-        transform: scale(1.2);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1);
-    }
-}
-
-.animate-roll {
-    animation: rollIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-.animate-pop {
-    animation: popIn 0.4s ease-out forwards;
-}
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap');
 
 /* Scrollbar Styling */
 .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #4b5563;
+    background-color: #374151;
     border-radius: 20px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #4b5563;
+}
+
+/* Ball Base Style - Enhanced 3D look */
+.lotto-ball {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 800;
+    font-size: 1.5rem;
+    color: #fff;
+    text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+    box-shadow:
+        inset -5px -5px 15px rgba(0,0,0,0.4),
+        inset 5px 5px 15px rgba(255,255,255,0.2),
+        0 8px 20px rgba(0,0,0,0.5);
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Glass shine on ball */
+.lotto-ball::before {
+    content: '';
+    position: absolute;
+    top: 5%;
+    left: 10%;
+    width: 35%;
+    height: 20%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%);
+    transform: rotate(-45deg);
+}
+
+/* Colors for specific ranges (Standard Lotto Colors) with gradients */
+.ball-range-1 { background: radial-gradient(circle at 30% 30%, #fbc400, #b8860b); }
+.ball-range-2 { background: radial-gradient(circle at 30% 30%, #69c, #27408b); }
+.ball-range-3 { background: radial-gradient(circle at 30% 30%, #ff7272, #8b0000); }
+.ball-range-4 { background: radial-gradient(circle at 30% 30%, #aaa, #444); }
+.ball-range-5 { background: radial-gradient(circle at 30% 30%, #b0d840, #556b2f); }
+
+/* Small balls for history list */
+.lotto-ball-sm {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.75rem;
+    box-shadow: inset -2px -2px 5px rgba(0,0,0,0.3);
+}
+
+/* Animations */
+@keyframes rollIn {
+    0% {
+        transform: translateX(-50px) rotate(-360deg) scale(0.5);
+        opacity: 0;
+    }
+    60% {
+        transform: translateX(10px) rotate(20deg) scale(1.1);
+        opacity: 1;
+    }
+    80% {
+        transform: translateX(-5px) rotate(-10deg) scale(0.95);
+    }
+    100% {
+        transform: translateX(0) rotate(0) scale(1);
+    }
+}
+
+@keyframes popIn {
+    0% {
+        transform: scale(0.8) translateY(10px);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-roll {
+    animation: rollIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-pop {
+    animation: popIn 0.3s ease-out forwards;
+}
+
+/* Glassmorphism Utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }

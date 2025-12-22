@@ -1,11 +1,22 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 로또 번호 추첨기</title>
+    <title>AI 로또 마스터 - 빅데이터 기반 로또 번호 예측 시스템</title>
+    <meta name="description" content="최첨단 AI 알고리즘과 빅데이터 분석을 통해 당신의 당첨 확률을 높여드립니다. 로또 번호 생성, 통계 분석, 당첨 기원.">
+    <meta name="keywords" content="로또, 로또번호생성기, AI로또, 무료로또, 로또명당, 로또분석">
+    <meta property="og:title" content="AI 로또 마스터 - 당신의 행운을 설계합니다">
+    <meta property="og:description" content="AI가 분석한 최적의 로또 조합을 지금 바로 확인하세요.">
+    <meta property="og:type" content="website">
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
+
     <script>
         tailwind.config = {
             theme: {
@@ -13,79 +24,193 @@
                     colors: {
                         'neon-blue': '#00f3ff',
                         'neon-purple': '#bc13fe',
-                        'dark-bg': '#0f172a',
-                        'panel-bg': '#1e293b',
+                        'dark-bg': '#0a0e17',
+                        'panel-bg': '#151e2e',
+                        'glass-bg': 'rgba(21, 30, 46, 0.7)',
                     },
-                    animation: {
-                        'spin-slow': 'spin 3s linear infinite',
+                    fontFamily: {
+                        sans: ['Pretendard', 'Apple SD Gothic Neo', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
 </head>
-<body class="bg-dark-bg text-white min-h-screen flex flex-col items-center py-10 font-sans">
+<body class="bg-dark-bg text-white min-h-screen flex flex-col font-sans overflow-x-hidden">
 
-    <!-- Header -->
-    <header class="text-center mb-10 relative z-10">
-        <h1 class="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple drop-shadow-lg">
-            AI LOTTO GEN
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 backdrop-blur-md bg-dark-bg/80 border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-gradient-to-tr from-neon-blue to-neon-purple rounded-lg flex items-center justify-center font-bold text-white">AI</div>
+                    <span class="font-bold text-xl tracking-tight">Lotto Master</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#hero" class="hover:text-neon-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">홈</a>
+                        <a href="#generator" class="hover:text-neon-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">번호 생성</a>
+                        <a href="#stats" class="hover:text-neon-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">통계 분석</a>
+                        <a href="#features" class="hover:text-neon-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">특징</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="relative pt-32 pb-20 px-4 flex flex-col items-center text-center overflow-hidden">
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-neon-blue/20 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+
+        <span class="inline-block py-1 px-3 rounded-full bg-white/5 border border-white/10 text-neon-blue text-xs font-semibold tracking-wide mb-6 animate-pulse">
+            v2.0 업데이트: 예측 알고리즘 고도화 완료
+        </span>
+        <h1 class="text-5xl md:text-7xl font-extrabold text-white mb-6 leading-tight">
+            당신의 행운을 <br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple">과학으로 증명합니다</span>
         </h1>
-        <p class="text-gray-400 mt-2 text-sm md:text-base">빅데이터 기반 당첨 확률 분석 시스템</p>
-    </header>
+        <p class="text-gray-400 text-lg md:text-xl max-w-2xl mb-10 leading-relaxed">
+            단순한 무작위 추첨이 아닙니다. 과거 당첨 데이터 패턴 분석과 가중치 시스템을 적용한
+            차세대 AI 로또 번호 생성기를 경험하세요.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <a href="#generator" class="px-8 py-4 bg-gradient-to-r from-neon-blue to-neon-purple rounded-full font-bold text-lg hover:shadow-lg hover:shadow-neon-blue/25 transition-all transform hover:-translate-y-1">
+                무료로 번호 생성하기
+            </a>
+            <a href="#stats" class="px-8 py-4 bg-white/5 border border-white/10 rounded-full font-bold text-lg hover:bg-white/10 transition-all">
+                분석 리포트 보기
+            </a>
+        </div>
+    </section>
 
-    <!-- Main Card -->
-    <main class="w-full max-w-lg px-4 relative z-10">
+    <!-- Main App Section (Generator + History) -->
+    <section id="generator" class="py-20 px-4 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        <!-- Ball Display Area -->
-        <div class="bg-panel-bg rounded-2xl shadow-2xl shadow-neon-blue/20 p-8 mb-6 border border-gray-700 relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-br from-neon-blue/5 to-transparent pointer-events-none"></div>
+        <!-- Left: Generator -->
+        <div class="lg:col-span-2 bg-glass-bg backdrop-blur-xl rounded-3xl p-8 border border-white/5 shadow-2xl relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-br from-neon-blue/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
-            <div id="ball-container" class="flex flex-wrap justify-center gap-4 min-h-[80px]">
-                <!-- Balls will be injected here via JS -->
-                <div class="text-gray-500 italic animate-pulse">번호를 생성해주세요...</div>
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    <span class="w-2 h-8 bg-neon-blue rounded-full"></span>
+                    AI 번호 추출기
+                </h2>
+                <div class="text-xs text-gray-500 bg-black/30 px-3 py-1 rounded-full border border-white/5">
+                    Mode: <span class="text-neon-blue">Standard Hybrid</span>
+                </div>
+            </div>
+
+            <!-- Ball Display -->
+            <div class="bg-black/40 rounded-2xl p-10 mb-8 border border-white/5 shadow-inner min-h-[160px] flex items-center justify-center relative overflow-hidden">
+                <div id="ball-container" class="flex flex-wrap justify-center gap-4 z-10">
+                    <div class="text-gray-500 italic">"생성하기" 버튼을 눌러주세요</div>
+                </div>
+                <!-- Grid background effect -->
+                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-30"></div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-col items-center">
+                <button id="generate-btn" class="relative group w-full max-w-sm">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-neon-blue to-neon-purple rounded-xl blur opacity-75 group-hover:opacity-100 transition duration-200"></div>
+                    <div class="relative bg-gray-900 rounded-xl px-8 py-5 flex items-center justify-center gap-3">
+                        <span class="text-xl font-bold text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-200 transition-all">
+                            AI 분석 및 번호 생성
+                        </span>
+                        <svg class="w-6 h-6 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    </div>
+                </button>
+                <p id="status-text" class="text-sm text-neon-blue mt-4 h-5 opacity-0 transition-opacity">데이터 처리 중...</p>
+            </div>
+
+            <!-- Ad Placement (Native style) -->
+            <div class="mt-8 pt-6 border-t border-white/5">
+                <div class="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg p-4 flex items-center justify-between border border-white/5 hover:border-white/20 cursor-pointer transition-colors group/ad">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-white/10 rounded flex items-center justify-center text-xs text-gray-500">IMG</div>
+                        <div>
+                            <p class="text-sm font-bold text-gray-300 group-hover/ad:text-white">프리미엄 멤버십 런칭</p>
+                            <p class="text-xs text-gray-500">광고 제거 및 무제한 분석 기능 제공</p>
+                        </div>
+                    </div>
+                    <span class="text-xs bg-black/50 px-2 py-1 rounded text-gray-600 border border-white/5">AD</span>
+                </div>
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="text-center mb-8">
-            <button id="generate-btn" class="relative inline-flex items-center justify-center p-0.5 mb-2 mr-2 overflow-hidden text-sm font-medium rounded-lg group bg-gradient-to-br from-neon-blue to-neon-purple group-hover:from-neon-blue group-hover:to-neon-purple hover:text-white focus:ring-4 focus:outline-none focus:ring-purple-800 transform hover:scale-105 transition-transform duration-200 active:scale-95">
-                <span class="relative px-12 py-4 transition-all ease-in duration-75 bg-gray-900 rounded-md group-hover:bg-opacity-0 text-xl font-bold text-white">
-                    AI 번호 생성하기
-                </span>
-            </button>
-            <p id="status-text" class="text-xs text-neon-blue h-4 mt-2 opacity-0 transition-opacity">과거 데이터 분석 중...</p>
-        </div>
+        <!-- Right: My Numbers -->
+        <div class="lg:col-span-1 bg-panel-bg rounded-3xl p-6 border border-white/5 shadow-xl flex flex-col h-full max-h-[600px]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold text-gray-200">📂 저장된 번호</h3>
+                <div class="flex gap-2">
+                    <button id="copy-btn" class="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded transition-colors text-gray-300" title="전체 복사">
+                        Copy All
+                    </button>
+                    <span id="save-count" class="bg-neon-purple text-xs px-2 py-1 rounded text-white font-bold">0</span>
+                </div>
+            </div>
 
-        <!-- ADVERTISEMENT SECTION (Requested Requirement) -->
-        <div class="w-full bg-gray-800 border-2 border-dashed border-gray-600 rounded-lg h-32 flex items-center justify-center mb-8 relative overflow-hidden group cursor-pointer hover:border-gray-500 transition-colors">
-            <div class="absolute top-1 right-2 text-[10px] text-gray-500 border border-gray-600 px-1 rounded">AD</div>
-            <div class="text-center">
-                <p class="text-gray-400 font-bold text-lg">스폰서 광고 영역</p>
-                <p class="text-gray-600 text-sm">이곳에 광고가 표시됩니다.</p>
-                <button class="mt-2 text-xs bg-gray-700 px-2 py-1 rounded text-gray-400 group-hover:bg-gray-600 group-hover:text-white transition-colors">자세히 보기</button>
+            <div class="flex-1 overflow-y-auto pr-2 scrollbar-thin space-y-3" id="my-numbers-list">
+                <div class="h-full flex flex-col items-center justify-center text-gray-600 text-sm">
+                    <svg class="w-10 h-10 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <p>생성된 번호가 여기에 저장됩니다.</p>
+                </div>
             </div>
         </div>
+    </section>
 
-        <!-- My Numbers History -->
-        <div class="bg-panel-bg/80 rounded-xl p-6 border border-gray-700 backdrop-blur-sm">
-            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-                <h2 class="text-xl font-bold text-gray-200">📂 나의 번호 리스트</h2>
-                <span id="save-count" class="bg-gray-700 text-xs px-2 py-1 rounded-full text-gray-300">0개</span>
+    <!-- Statistics Section -->
+    <section id="stats" class="py-20 bg-black/20">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">실시간 데이터 분석</h2>
+                <p class="text-gray-400">최근 생성된 번호들의 빈도수를 시각화하여 제공합니다.</p>
             </div>
-            <ul id="my-numbers-list" class="space-y-3 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                <!-- Saved numbers will go here -->
-                <li class="text-center text-gray-500 text-sm py-4">아직 저장된 번호가 없습니다.</li>
-            </ul>
+
+            <div class="bg-panel-bg p-6 rounded-3xl border border-white/5 shadow-lg relative">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">🔥 Hot Numbers</h3>
+                    <select class="bg-black/30 border border-white/10 rounded px-3 py-1 text-sm text-gray-300 focus:outline-none">
+                        <option>최근 100회 기준</option>
+                        <option>전체 기간 기준</option>
+                    </select>
+                </div>
+                <div class="w-full h-[300px] md:h-[400px]">
+                    <canvas id="statsChart"></canvas>
+                </div>
+            </div>
         </div>
+    </section>
 
-    </main>
+    <!-- Features Grid -->
+    <section id="features" class="py-20 px-4 max-w-6xl mx-auto">
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="bg-white/5 p-8 rounded-2xl border border-white/5 hover:border-neon-blue/30 transition-colors">
+                <div class="w-12 h-12 bg-neon-blue/20 rounded-lg flex items-center justify-center text-neon-blue mb-4 text-2xl">⚡️</div>
+                <h3 class="text-xl font-bold mb-2">초고속 엔진</h3>
+                <p class="text-gray-400 text-sm">브라우저 내에서 즉시 실행되는 경량화된 알고리즘으로 지연 없는 결과를 제공합니다.</p>
+            </div>
+            <div class="bg-white/5 p-8 rounded-2xl border border-white/5 hover:border-neon-purple/30 transition-colors">
+                <div class="w-12 h-12 bg-neon-purple/20 rounded-lg flex items-center justify-center text-neon-purple mb-4 text-2xl">🧠</div>
+                <h3 class="text-xl font-bold mb-2">패턴 학습</h3>
+                <p class="text-gray-400 text-sm">제외수, 고정수, 이월수 등 다양한 로또 패턴을 학습한 가중치 시스템이 적용되어 있습니다.</p>
+            </div>
+            <div class="bg-white/5 p-8 rounded-2xl border border-white/5 hover:border-pink-500/30 transition-colors">
+                <div class="w-12 h-12 bg-pink-500/20 rounded-lg flex items-center justify-center text-pink-500 mb-4 text-2xl">🔒</div>
+                <h3 class="text-xl font-bold mb-2">프라이버시</h3>
+                <p class="text-gray-400 text-sm">모든 데이터는 사용자 브라우저에만 저장되며, 외부 서버로 전송되지 않습니다.</p>
+            </div>
+        </div>
+    </section>
 
-    <!-- Background Elements for Atmosphere -->
-    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-neon-purple/20 rounded-full blur-[120px]"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-neon-blue/20 rounded-full blur-[120px]"></div>
-    </div>
+    <!-- Footer -->
+    <footer class="bg-black py-10 border-t border-white/10 text-center">
+        <p class="text-gray-500 text-sm">
+            © 2023 AI Lotto Master. All rights reserved.<br>
+            본 서비스가 제공하는 번호는 통계적 확률에 기반한 예측일 뿐, 당첨을 보장하지 않습니다. 과도한 복권 구매는 정신 건강에 해로울 수 있습니다.
+        </p>
+    </footer>
 
     <script src="script.js"></script>
 </body>
