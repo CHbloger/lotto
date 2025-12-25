@@ -1,4 +1,4 @@
-// Script for AI Lotto Master (v3.0 - Real Data & Persistence)
+// Script for AI Lotto Master (v3.1 - Fixes & Robustness)
 
 document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generate-btn');
@@ -14,6 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Weighted Probability Map
     let numberWeights = {};
 
+    let statsChart = null; // Chart instance
+
+    // Bind Event Listeners FIRST to ensure they work even if init() fails partially
+    if (generateBtn) generateBtn.addEventListener('click', runGeneration);
+    if (copyBtn) copyBtn.addEventListener('click', copyToClipboard);
+
     // Initialize
     init();
 
@@ -24,10 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Load LocalStorage
         loadHistory();
 
-        // 3. Initialize Chart (Empty initially)
-        initChart();
+        // 3. Initialize Chart (Safe)
+        try {
+            initChart();
+        } catch (e) {
+            console.error("Chart initialization failed:", e);
+        }
 
         // 4. Fetch Real Data & Apply Analysis
+        // We run this without awaiting so it doesn't block UI
         fetchAndAnalyzeData();
     }
 
@@ -40,38 +51,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Real Data Integration ---
 
     function getCurrentRound() {
-        // Lotto started on 2002-12-07 (Round 1)
-        // Draws are every Saturday.
         const startDate = new Date('2002-12-07T20:40:00');
         const now = new Date();
-
         const diffTime = now - startDate;
         const diffDays = diffTime / (1000 * 60 * 60 * 24);
-        const round = Math.floor(diffDays / 7) + 1;
-
-        return round;
+        return Math.floor(diffDays / 7) + 1;
     }
 
     async function fetchAndAnalyzeData() {
         const currentRound = getCurrentRound();
-        statusText.classList.remove('opacity-0');
-        statusText.innerText = `최신 데이터(${currentRound}회) 연동 중...`;
+        if (statusText) {
+            statusText.classList.remove('opacity-0');
+            statusText.innerText = `최신 데이터(${currentRound}회) 연동 중...`;
+        }
 
-        // Fetch last 10 rounds
         const roundsToFetch = 10;
-        const fetchedNumbers = []; // All numbers from last 10 rounds
+        const fetchedNumbers = [];
 
         try {
-            // We fetch the last 10 valid rounds
             const startRound = currentRound - 1;
-
             const promises = [];
+
+            // Use allorigins to bypass CORS
+            // Note: If this API is unstable, we might need a fallback or just handle error.
             for (let i = 0; i < roundsToFetch; i++) {
                 const r = startRound - i;
                 if (r < 1) continue;
-                // Use allorigins proxy to bypass CORS
                 const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${r}`)}`;
-                promises.push(fetch(url).then(res => res.json()).then(data => JSON.parse(data.contents)));
+                promises.push(
+                    fetch(url)
+                    .then(res => {
+                        if (!res.ok) throw new Error('Network response was not ok');
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (!data.contents) return null;
+                        return JSON.parse(data.contents);
+                    })
+                    .catch(err => null) // Catch individual fetch errors to not fail Promise.all completely if one fails?
+                                        // Actually Promise.all fails if one fails. Let's map catch to null.
+                );
             }
 
             const results = await Promise.all(promises);
@@ -86,47 +105,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (validCount > 0) {
                 applyAnalysisToWeights(fetchedNumbers);
-                statusText.innerText = `최신 ${validCount}회차 분석 완료!`;
-
-                // Update chart with real data for "Hot Numbers" visualization
+                if (statusText) statusText.innerText = `최신 ${validCount}회차 분석 완료!`;
                 updateChartWithRealData(fetchedNumbers);
             } else {
-                statusText.innerText = "데이터 연동 실패 (기본 모드)";
+                console.warn("No valid data fetched.");
+                if (statusText) statusText.innerText = "데이터 연동 실패 (기본 모드)";
             }
 
         } catch (error) {
             console.error("Failed to fetch lotto data:", error);
-            statusText.innerText = "오프라인 모드 (기본 가중치)";
+            if (statusText) statusText.innerText = "오프라인 모드 (기본 가중치)";
         }
 
         setTimeout(() => {
-             if (!generateBtn.disabled) statusText.classList.add('opacity-0');
+             if (statusText && !generateBtn.disabled) statusText.classList.add('opacity-0');
         }, 3000);
     }
 
     function applyAnalysisToWeights(recentNumbers) {
-        // Count frequencies
         const counts = {};
         for (let i = 1; i <= 45; i++) counts[i] = 0;
 
         recentNumbers.forEach(num => {
-            counts[num]++;
+            if (num) counts[num]++;
         });
 
-        // Apply Hot/Cold Logic
         for (let i = 1; i <= 45; i++) {
             const count = counts[i];
-
             if (count === 0) {
-                // Cold: Has not appeared in last 10 rounds -> Boost significantly
                 numberWeights[i] += 2.0;
             } else if (count >= 3) {
-                // Hot: Appeared frequently -> Lower weight
                 numberWeights[i] = Math.max(0.1, numberWeights[i] - 0.5);
             }
         }
-
-        console.log("Updated Weights based on analysis:", numberWeights);
+        console.log("Updated Weights:", numberWeights);
     }
 
     // --- Core Generator ---
@@ -140,6 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 candidates.push({ number: i, weight: numberWeights[i] });
             }
         }
+
+        if (candidates.length === 0) return 1; // Fallback
+
         let randomVal = Math.random() * totalWeight;
         for (const candidate of candidates) {
             randomVal -= candidate.weight;
@@ -150,8 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function generateNumbers() {
         const selectedNumbers = new Set();
-        while (selectedNumbers.size < 6) {
+        // Safety break to prevent infinite loop if something goes wrong
+        let safety = 0;
+        while (selectedNumbers.size < 6 && safety < 100) {
             selectedNumbers.add(getWeightedRandomNumber(selectedNumbers));
+            safety++;
         }
         return Array.from(selectedNumbers).sort((a, b) => a - b);
     }
@@ -170,14 +188,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // UI Feedback
         generateBtn.disabled = true;
         generateBtn.classList.add('opacity-75', 'cursor-wait');
-        statusText.classList.remove('opacity-0');
-        statusText.innerText = "동적 가중치 계산 중...";
+        if (statusText) {
+            statusText.classList.remove('opacity-0');
+            statusText.innerText = "가중치 알고리즘 실행 중...";
+        }
 
-        ballContainer.innerHTML = '';
+        if (ballContainer) ballContainer.innerHTML = '';
 
-        await delay(400);
-        statusText.innerText = "AI 예측 모델 실행...";
-        await delay(400);
+        await delay(300);
+        if (statusText) statusText.innerText = "번호 추출 중...";
+        await delay(300);
 
         const numbers = generateNumbers();
 
@@ -187,9 +207,10 @@ document.addEventListener('DOMContentLoaded', () => {
             createBallElement(numbers[i]);
         }
 
-        statusText.innerText = "생성 완료";
+        if (statusText) statusText.innerText = "생성 완료";
+
         setTimeout(() => {
-            statusText.classList.add('opacity-0');
+            if (statusText) statusText.classList.add('opacity-0');
             generateBtn.disabled = false;
             generateBtn.classList.remove('opacity-75', 'cursor-wait');
         }, 1500);
@@ -198,13 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createBallElement(num) {
+        if (!ballContainer) return;
         const ball = document.createElement('div');
         ball.classList.add('lotto-ball', getBallColorClass(num), 'animate-roll');
         ball.textContent = num;
         ballContainer.appendChild(ball);
     }
 
-    // --- Persistence (LocalStorage) ---
+    // --- Persistence ---
 
     function loadHistory() {
         const stored = localStorage.getItem('lottoHistory');
@@ -212,9 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 historyData = JSON.parse(stored);
                 savedCount = historyData.length;
-                saveCountBadge.textContent = savedCount;
-
-                // Render UI
+                if (saveCountBadge) saveCountBadge.textContent = savedCount;
                 renderHistoryUI();
             } catch (e) {
                 console.error("Corrupt history data", e);
@@ -224,18 +244,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveToHistory(numbers) {
-        const entry = {
-            id: Date.now(),
-            numbers: numbers
-        };
-        historyData.unshift(entry); // Add to top
-        // Limit history to 50 items
+        const entry = { id: Date.now(), numbers: numbers };
+        historyData.unshift(entry);
         if (historyData.length > 50) historyData.pop();
 
-        localStorage.setItem('lottoHistory', JSON.stringify(historyData));
-        savedCount = historyData.length;
-        saveCountBadge.textContent = savedCount;
+        try {
+            localStorage.setItem('lottoHistory', JSON.stringify(historyData));
+        } catch (e) {
+            console.error("LocalStorage full or error", e);
+        }
 
+        savedCount = historyData.length;
+        if (saveCountBadge) saveCountBadge.textContent = savedCount;
         renderHistoryUI();
     }
 
@@ -243,19 +263,18 @@ document.addEventListener('DOMContentLoaded', () => {
         historyData = historyData.filter(item => item.id !== id);
         localStorage.setItem('lottoHistory', JSON.stringify(historyData));
         savedCount = historyData.length;
-        saveCountBadge.textContent = savedCount;
-
+        if (saveCountBadge) saveCountBadge.textContent = savedCount;
         renderHistoryUI();
     }
 
     function renderHistoryUI() {
+        if (!myListContainer) return;
         myListContainer.innerHTML = '';
 
         if (historyData.length === 0) {
             myListContainer.innerHTML = `
                 <div class="h-full flex flex-col items-center justify-center text-gray-600 text-sm">
-                    <svg class="w-10 h-10 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    <p>생성된 번호가 여기에 저장됩니다.</p>
+                    <p>저장된 번호가 없습니다.</p>
                 </div>`;
             return;
         }
@@ -275,8 +294,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const delBtn = document.createElement('button');
-            delBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-            delBtn.className = 'text-gray-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity';
+            delBtn.innerHTML = '×';
+            delBtn.className = 'text-gray-400 hover:text-red-400 px-2 text-xl opacity-0 group-hover:opacity-100 transition-opacity';
             delBtn.onclick = () => removeFromHistory(item.id);
 
             div.appendChild(ballsDiv);
@@ -287,10 +306,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Chart & Utilities ---
 
-    let statsChart;
-
     function initChart() {
-        const ctx = document.getElementById('statsChart').getContext('2d');
+        const canvas = document.getElementById('statsChart');
+        if (!canvas) {
+            console.warn("Chart canvas not found");
+            return;
+        }
+        if (typeof Chart === 'undefined') {
+            console.error("Chart.js library not loaded");
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
         const labels = Array.from({length: 45}, (_, i) => i + 1);
         const initialData = Array(45).fill(0);
 
@@ -330,7 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateChartWithRealData(numbers) {
-        // Count frequencies from real data
+        if (!statsChart) return;
+
         const counts = Array(45).fill(0);
         numbers.forEach(num => {
             if (num >= 1 && num <= 45) counts[num - 1]++;
@@ -344,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    copyBtn.addEventListener('click', () => {
+    function copyToClipboard() {
         if (historyData.length === 0) {
             alert('저장된 번호가 없습니다.');
             return;
@@ -359,7 +387,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(err => {
             console.error('Copy failed', err);
         });
-    });
-
-    generateBtn.addEventListener('click', runGeneration);
+    }
 });
