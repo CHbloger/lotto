@@ -1,8 +1,9 @@
-// Script for AI Lotto Master (Korea 6/45)
+// Script for AI Lotto Master (Korea 6/45) - Optimized
 
 let numberWeights = {};
 let historyData = [];
 let statsChart = null;
+let lottoArchive = {}; // Cache for past rounds: { roundNumber: dataObject }
 
 document.addEventListener('DOMContentLoaded', () => {
     // Elements
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function init() {
         resetWeights();
         loadHistory();
+        loadArchive(); // Load cached lotto results
         initChart();
         fetchAndAnalyzeData();
     }
@@ -43,61 +45,99 @@ document.addEventListener('DOMContentLoaded', () => {
             status.innerText = "연결 중...";
             status.previousElementSibling.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
         }
-        if (sText) sText.innerText = "데이터 분석 중...";
+        if (sText) sText.innerText = "데이터 확인 중...";
 
         try {
             const currentRound = getKrRound();
-            const roundsToFetch = 10;
-            const fetchedNumbers = [];
-            let latestWinData = null; // To store the very first (latest) valid result
 
-            // Limit concurrency
-            const promises = [];
-            for (let i = 0; i < roundsToFetch; i++) {
-                const r = currentRound - 1 - i;
-                if (r < 1) continue;
-                const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${r}`)}`;
-                promises.push(fetch(url).then(r => r.json()).then(d => JSON.parse(d.contents)).catch(e => null));
+            // 1. Try to render latest banner IMMEDIATELY from cache if possible
+            // We might have the previous week's data which is "latest" enough until we fetch new.
+            // But ideally we want the *actual* latest.
+            // Check if we have currentRound or currentRound-1 in archive.
+            let latestData = lottoArchive[currentRound] || lottoArchive[currentRound - 1];
+            if (latestData) {
+                updateLatestWinBanner(latestData);
             }
 
-            const results = await Promise.all(promises);
+            // 2. Identify missing rounds (Last 10)
+            const roundsToFetch = 10;
+            const missingRounds = [];
+            const neededRounds = [];
+
+            for (let i = 0; i < roundsToFetch; i++) {
+                const r = currentRound - i; // Try fetching current round too (it might be Saturday night)
+                // Actually getKrRound estimates.
+                // Let's check: if it returns X, maybe X isn't drawn yet.
+                // But the API returns null/fail if not drawn.
+                // We'll try fetching currentRound down to currentRound-10.
+                if (r < 1) continue;
+                neededRounds.push(r);
+                if (!lottoArchive[r]) {
+                    missingRounds.push(r);
+                }
+            }
+
+            // 3. Prioritize fetching the latest missing round (likely currentRound or currentRound-1)
+            // This ensures the banner updates fast if cache is stale.
+            if (missingRounds.length > 0) {
+                 // Sort descending so we fetch highest round first
+                 missingRounds.sort((a,b) => b-a);
+
+                 // Fetch the very first missing round (Latest) separately and update UI
+                 const latestMissing = missingRounds[0];
+                 const latestRes = await fetchRound(latestMissing);
+
+                 if (latestRes && latestRes.returnValue === 'success') {
+                     lottoArchive[latestMissing] = latestRes;
+                     saveArchive();
+                     // Update banner if this is indeed the latest we have
+                     if (!latestData || latestRes.drwNo > latestData.drwNo) {
+                         latestData = latestRes;
+                         updateLatestWinBanner(latestData);
+                     }
+                     // Remove from missing list
+                     missingRounds.shift();
+                 }
+            }
+
+            // 4. Fetch remaining missing rounds in parallel
+            if (missingRounds.length > 0) {
+                if (sText) sText.innerText = "과거 데이터 동기화 중...";
+                const promises = missingRounds.map(r => fetchRound(r));
+                const results = await Promise.all(promises);
+
+                results.forEach(data => {
+                    if (data && data.returnValue === 'success') {
+                        lottoArchive[data.drwNo] = data;
+                    }
+                });
+                saveArchive();
+            }
+
+            // 5. Aggregate Data for Analysis
+            // Collect all valid rounds from neededRounds list
+            const aggregatedNumbers = [];
             let validCount = 0;
 
-            results.forEach((data, index) => {
+            neededRounds.forEach(r => {
+                const data = lottoArchive[r];
                 if (data && data.returnValue === 'success') {
                     validCount++;
-                    fetchedNumbers.push(data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6);
-
-                    // Capture the latest valid data (first one in loop is mostly likely latest since we iterate backwards, but results order might vary due to async promise)
-                    // Wait, Promise.all maintains order of promises.
-                    // Loop is: r = currentRound - 1 - i. So i=0 is latest.
-                    // So results[0] is the latest round we asked for.
-
-                    // We want the most recent *successful* data.
-                    if (!latestWinData) {
-                        latestWinData = data;
-                    } else if (data.drwNo > latestWinData.drwNo) {
-                        // Just in case
-                        latestWinData = data;
-                    }
+                    aggregatedNumbers.push(data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6);
                 }
             });
 
             if (validCount > 0) {
-                applyAnalysis(fetchedNumbers);
+                applyAnalysis(aggregatedNumbers);
                 if (sText) sText.innerText = `최근 ${validCount}회차 분석 완료`;
                 if (status) {
                     status.innerText = "Online";
                     status.previousElementSibling.className = "w-2 h-2 rounded-full bg-green-500 animate-pulse";
                 }
-                updateChartData(fetchedNumbers);
-
-                // NEW: Update Latest Win Banner
-                if (latestWinData) {
-                    updateLatestWinBanner(latestWinData);
-                }
+                updateChartData(aggregatedNumbers);
             } else {
-                throw new Error("No data");
+                // Should practically never happen if we have cache or internet
+                console.warn("No data available for analysis");
             }
 
         } catch (e) {
@@ -110,6 +150,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchRound(r) {
+        try {
+            const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${r}`)}`;
+            const response = await fetch(url);
+            const json = await response.json();
+            return JSON.parse(json.contents);
+        } catch (e) {
+            return null;
+        }
+    }
+
     function updateLatestWinBanner(data) {
         const card = document.getElementById('latest-win-card');
         if (!card) return;
@@ -118,10 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('latest-drw-no').innerText = `${data.drwNo}회`;
         document.getElementById('latest-drw-date').innerText = `${data.drwNoDate} 추첨`;
 
-        // Prize (firstAccumamnt is total, firstWinamnt is per person. API keys: firstWinamnt, firstPrzwnerCo etc)
-        // dhlottery API returns 'firstWinamnt' usually.
         if (data.firstWinamnt) {
-             // Format currency (e.g. 2,000,000,000)
              const prize = new Intl.NumberFormat('ko-KR').format(data.firstWinamnt);
              document.getElementById('latest-prize').innerText = `₩${prize}`;
         }
@@ -139,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ballContainer.appendChild(ball);
         });
 
-        // Bonus
         const plus = document.createElement('span');
         plus.className = 'text-gray-500 font-bold self-center';
         plus.innerText = '+';
@@ -149,16 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
         bBall.className = `w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${getBallColorClass(bonus)}`;
         bBall.innerText = bonus;
         ballContainer.appendChild(bBall);
-
-        const bLabel = document.createElement('span');
-        bLabel.className = 'text-[10px] text-gray-400 self-end ml-[-40px] mb-[-15px]';
-        // bLabel.innerText = '보너스';
-        // ballContainer.appendChild(bLabel);
     }
 
     function getKrRound() {
         const start = new Date('2002-12-07T20:40:00');
         const now = new Date();
+        // Adjust for Draw Time (Sat 8:40 PM) - If before draw, it's previous round
+        // Simple approximation:
         return Math.floor((now - start) / (1000 * 60 * 60 * 24 * 7)) + 1;
     }
 
@@ -166,18 +210,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const counts = {};
         numbers.forEach(n => counts[n] = (counts[n] || 0) + 1);
 
-        // Simple Hot/Cold
         for (let i = 1; i <= 45; i++) {
             const c = counts[i] || 0;
-            if (c === 0) numberWeights[i] += 2.0; // Cold
-            else if (c >= 3) numberWeights[i] = Math.max(0.1, numberWeights[i] - 0.5); // Hot
+            if (c === 0) numberWeights[i] += 2.0;
+            else if (c >= 3) numberWeights[i] = Math.max(0.1, numberWeights[i] - 0.5);
         }
     }
 
     // --- Generation Logic ---
 
     function getWeightedRandom(excluded) {
-        // Fallback
         if (Object.keys(numberWeights).length === 0) resetWeights();
 
         let total = 0;
@@ -212,14 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await delay(500);
 
-        // Generate 6 unique numbers
         const selected = new Set();
         while (selected.size < 6) {
             selected.add(getWeightedRandom(selected));
         }
         const sortedNumbers = Array.from(selected).sort((a,b) => a-b);
 
-        // Animation
         for (const n of sortedNumbers) {
             await delay(150);
             createBall(n);
@@ -227,7 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (sText) sText.innerText = "생성 완료";
 
-        // Save
         const resultObj = {
             id: Date.now(),
             main: sortedNumbers
@@ -258,6 +297,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Persistence ---
 
+    function saveArchive() {
+        try {
+            // Prune old rounds to save space? Keep only last 20 for safety
+            // Sort keys
+            const keys = Object.keys(lottoArchive).map(Number).sort((a,b) => b-a);
+            const keep = keys.slice(0, 20);
+            const pruned = {};
+            keep.forEach(k => pruned[k] = lottoArchive[k]);
+
+            localStorage.setItem('lottoArchive', JSON.stringify(pruned));
+        } catch (e) {
+            console.error("Failed to save archive", e);
+        }
+    }
+
+    function loadArchive() {
+        try {
+            const s = localStorage.getItem('lottoArchive');
+            if (s) lottoArchive = JSON.parse(s);
+        } catch (e) {}
+    }
+
     function saveToHistory(obj) {
         historyData.unshift(obj);
         if (historyData.length > 50) historyData.pop();
@@ -270,8 +331,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (s) {
             try { historyData = JSON.parse(s); } catch(e){}
         }
-        // If history format changed (v5 had 'game' field), we can filter or adapt.
-        // For simplicity, we just render what we can.
         renderHistory();
     }
 
@@ -291,16 +350,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = 'bg-white/5 p-3 rounded-lg flex flex-col gap-2 border border-white/5 hover:bg-white/10 transition-colors text-sm';
 
-            // Header
             const head = document.createElement('div');
             head.className = 'flex justify-between items-center text-xs text-gray-400';
             head.innerHTML = `<span>${new Date(item.id).toLocaleTimeString()}</span>`;
 
-            // Numbers
             const numDiv = document.createElement('div');
             numDiv.className = 'flex flex-wrap gap-1 items-center';
 
-            // Compatibility: item.main exists in v5, item.numbers in v3/4
             const nums = item.main || item.numbers || [];
 
             nums.forEach(n => {
@@ -313,7 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
             div.appendChild(head);
             div.appendChild(numDiv);
 
-            // Delete button (overlay or corner)
             const del = document.createElement('button');
             del.innerHTML = '×';
             del.className = 'absolute top-1 right-1 text-gray-500 hover:text-red-400 px-2';
