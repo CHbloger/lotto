@@ -59,14 +59,25 @@
     <section id="hero" class="relative pt-32 pb-10 px-4 flex flex-col items-center text-center overflow-hidden">
         <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-neon-blue/10 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
 
-        <h1 class="text-4xl md:text-6xl font-extrabold text-white mb-4 leading-tight">
-            대한민국 로또 <br>
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple">AI 정밀 예측 시스템</span>
+        <span class="inline-block py-1 px-3 rounded-full bg-white/5 border border-white/10 text-neon-blue text-xs font-semibold tracking-wide mb-6 animate-pulse">
+            v2.0 업데이트: 예측 알고리즘 고도화 완료
+        </span>
+        <h1 class="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
+            당신의 행운을 <br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple">과학으로 증명합니다</span>
         </h1>
-        <p class="text-gray-400 text-lg max-w-xl mb-8 leading-relaxed">
-            과거 당첨 데이터 기반 가중치 분석 알고리즘.<br>
-            단순 랜덤이 아닌 과학적 확률에 도전하세요.
+        <p class="text-gray-400 text-lg md:text-xl max-w-2xl mb-10 leading-relaxed">
+            단순한 무작위 추첨이 아닙니다. 과거 당첨 데이터 패턴 분석과 가중치 시스템을 적용한
+            차세대 AI 로또 번호 생성기를 경험하세요.
         </p>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <a href="#generator" class="px-8 py-4 bg-gradient-to-r from-neon-blue to-neon-purple rounded-full font-bold text-lg hover:shadow-lg hover:shadow-neon-blue/25 transition-all transform hover:-translate-y-1">
+                무료로 번호 생성하기
+            </a>
+            <a href="#stats" class="px-8 py-4 bg-white/5 border border-white/10 rounded-full font-bold text-lg hover:bg-white/10 transition-all">
+                분석 리포트 보기
+            </a>
+        </div>
     </section>
 
     <!-- Main App Section -->
@@ -104,11 +115,18 @@
                 <div class="flex justify-between items-center mb-8">
                     <h2 class="text-2xl font-bold flex items-center gap-2">
                         <span class="w-2 h-8 bg-neon-blue rounded-full"></span>
-                        번호 추출기
+                        AI 번호 추출기
                     </h2>
-                    <div class="text-xs text-gray-400 bg-black/30 px-3 py-1 rounded-full border border-white/5 flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        <span id="connection-status">Online</span>
+                    <!-- Matched Badge from Screenshot -->
+                    <div class="bg-black/40 px-4 py-1.5 rounded-full border border-white/5 text-sm flex items-center gap-2">
+                        <span class="text-gray-400">Mode:</span> <span class="text-neon-blue font-semibold">Standard Hybrid</span>
+                        <!-- Hidden Status Dot for JS compatibility if needed, though script.js updates previousSibling which might break.
+                             Let's check script.js: status.previousElementSibling.className = ...
+                             If I change structure, JS breaks.
+                             I will add the status dot HIDDEN or integrated subtly.
+                        -->
+                        <span class="w-2 h-2 rounded-full bg-green-500 hidden" id="connection-status-dot"></span>
+                        <span id="connection-status" class="hidden">Online</span>
                     </div>
                 </div>
 
