@@ -1,177 +1,251 @@
-// Script for AI Lotto Master (v3.1 - Fixes & Robustness)
+// Script for AI Lotto Master (Korea 6/45)
+
+let numberWeights = {};
+let historyData = [];
+let statsChart = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Elements
     const generateBtn = document.getElementById('generate-btn');
     const ballContainer = document.getElementById('ball-container');
     const myListContainer = document.getElementById('my-numbers-list');
-    const saveCountBadge = document.getElementById('save-count');
     const statusText = document.getElementById('status-text');
     const copyBtn = document.getElementById('copy-btn');
 
-    let savedCount = 0;
-    let historyData = []; // Store objects { id: timestamp, numbers: [] }
-
-    // Weighted Probability Map
-    let numberWeights = {};
-
-    let statsChart = null; // Chart instance
-
-    // Bind Event Listeners FIRST to ensure they work even if init() fails partially
+    // Bind Events
     if (generateBtn) generateBtn.addEventListener('click', runGeneration);
     if (copyBtn) copyBtn.addEventListener('click', copyToClipboard);
 
-    // Initialize
+    // Init
     init();
 
     function init() {
-        // 1. Initialize Weights (Default 1.0)
         resetWeights();
-
-        // 2. Load LocalStorage
         loadHistory();
-
-        // 3. Initialize Chart (Safe)
-        try {
-            initChart();
-        } catch (e) {
-            console.error("Chart initialization failed:", e);
-        }
-
-        // 4. Fetch Real Data & Apply Analysis
-        // We run this without awaiting so it doesn't block UI
+        initChart();
         fetchAndAnalyzeData();
     }
 
     function resetWeights() {
+        numberWeights = {};
         for (let i = 1; i <= 45; i++) {
             numberWeights[i] = 1;
         }
     }
 
-    // --- Real Data Integration ---
-
-    function getCurrentRound() {
-        const startDate = new Date('2002-12-07T20:40:00');
-        const now = new Date();
-        const diffTime = now - startDate;
-        const diffDays = diffTime / (1000 * 60 * 60 * 24);
-        return Math.floor(diffDays / 7) + 1;
-    }
+    // --- Data & Analysis ---
 
     async function fetchAndAnalyzeData() {
-        const currentRound = getCurrentRound();
-        if (statusText) {
-            statusText.classList.remove('opacity-0');
-            statusText.innerText = `최신 데이터(${currentRound}회) 연동 중...`;
-        }
+        const status = document.getElementById('connection-status');
+        const sText = document.getElementById('status-text');
 
-        const roundsToFetch = 10;
-        const fetchedNumbers = [];
+        if (status) {
+            status.innerText = "연결 중...";
+            status.previousElementSibling.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
+        }
+        if (sText) sText.innerText = "데이터 분석 중...";
 
         try {
-            const startRound = currentRound - 1;
-            const promises = [];
+            const currentRound = getKrRound();
+            const roundsToFetch = 10;
+            const fetchedNumbers = [];
+            let latestWinData = null; // To store the very first (latest) valid result
 
-            // Use allorigins to bypass CORS
-            // Note: If this API is unstable, we might need a fallback or just handle error.
+            // Limit concurrency
+            const promises = [];
             for (let i = 0; i < roundsToFetch; i++) {
-                const r = startRound - i;
+                const r = currentRound - 1 - i;
                 if (r < 1) continue;
                 const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${r}`)}`;
-                promises.push(
-                    fetch(url)
-                    .then(res => {
-                        if (!res.ok) throw new Error('Network response was not ok');
-                        return res.json();
-                    })
-                    .then(data => {
-                        if (!data.contents) return null;
-                        return JSON.parse(data.contents);
-                    })
-                    .catch(err => null) // Catch individual fetch errors to not fail Promise.all completely if one fails?
-                                        // Actually Promise.all fails if one fails. Let's map catch to null.
-                );
+                promises.push(fetch(url).then(r => r.json()).then(d => JSON.parse(d.contents)).catch(e => null));
             }
 
             const results = await Promise.all(promises);
-
             let validCount = 0;
-            results.forEach(data => {
+
+            results.forEach((data, index) => {
                 if (data && data.returnValue === 'success') {
                     validCount++;
                     fetchedNumbers.push(data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6);
+
+                    // Capture the latest valid data (first one in loop is mostly likely latest since we iterate backwards, but results order might vary due to async promise)
+                    // Wait, Promise.all maintains order of promises.
+                    // Loop is: r = currentRound - 1 - i. So i=0 is latest.
+                    // So results[0] is the latest round we asked for.
+
+                    // We want the most recent *successful* data.
+                    if (!latestWinData) {
+                        latestWinData = data;
+                    } else if (data.drwNo > latestWinData.drwNo) {
+                        // Just in case
+                        latestWinData = data;
+                    }
                 }
             });
 
             if (validCount > 0) {
-                applyAnalysisToWeights(fetchedNumbers);
-                if (statusText) statusText.innerText = `최신 ${validCount}회차 분석 완료!`;
-                updateChartWithRealData(fetchedNumbers);
+                applyAnalysis(fetchedNumbers);
+                if (sText) sText.innerText = `최근 ${validCount}회차 분석 완료`;
+                if (status) {
+                    status.innerText = "Online";
+                    status.previousElementSibling.className = "w-2 h-2 rounded-full bg-green-500 animate-pulse";
+                }
+                updateChartData(fetchedNumbers);
+
+                // NEW: Update Latest Win Banner
+                if (latestWinData) {
+                    updateLatestWinBanner(latestWinData);
+                }
             } else {
-                console.warn("No valid data fetched.");
-                if (statusText) statusText.innerText = "데이터 연동 실패 (기본 모드)";
+                throw new Error("No data");
             }
 
-        } catch (error) {
-            console.error("Failed to fetch lotto data:", error);
-            if (statusText) statusText.innerText = "오프라인 모드 (기본 가중치)";
+        } catch (e) {
+            console.error("Fetch failed", e);
+            if (sText) sText.innerText = "오프라인 모드";
+            if (status) {
+                status.innerText = "Offline";
+                status.previousElementSibling.className = "w-2 h-2 rounded-full bg-red-500";
+            }
         }
-
-        setTimeout(() => {
-             if (statusText && !generateBtn.disabled) statusText.classList.add('opacity-0');
-        }, 3000);
     }
 
-    function applyAnalysisToWeights(recentNumbers) {
-        const counts = {};
-        for (let i = 1; i <= 45; i++) counts[i] = 0;
+    function updateLatestWinBanner(data) {
+        const card = document.getElementById('latest-win-card');
+        if (!card) return;
 
-        recentNumbers.forEach(num => {
-            if (num) counts[num]++;
+        card.classList.remove('hidden');
+        document.getElementById('latest-drw-no').innerText = `${data.drwNo}회`;
+        document.getElementById('latest-drw-date').innerText = `${data.drwNoDate} 추첨`;
+
+        // Prize (firstAccumamnt is total, firstWinamnt is per person. API keys: firstWinamnt, firstPrzwnerCo etc)
+        // dhlottery API returns 'firstWinamnt' usually.
+        if (data.firstWinamnt) {
+             // Format currency (e.g. 2,000,000,000)
+             const prize = new Intl.NumberFormat('ko-KR').format(data.firstWinamnt);
+             document.getElementById('latest-prize').innerText = `₩${prize}`;
+        }
+
+        const ballContainer = document.getElementById('latest-balls');
+        ballContainer.innerHTML = '';
+
+        const winNums = [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6];
+        const bonus = data.bnusNo;
+
+        winNums.forEach(num => {
+            const ball = document.createElement('span');
+            ball.className = `w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${getBallColorClass(num)}`;
+            ball.innerText = num;
+            ballContainer.appendChild(ball);
         });
 
-        for (let i = 1; i <= 45; i++) {
-            const count = counts[i];
-            if (count === 0) {
-                numberWeights[i] += 2.0;
-            } else if (count >= 3) {
-                numberWeights[i] = Math.max(0.1, numberWeights[i] - 0.5);
-            }
-        }
-        console.log("Updated Weights:", numberWeights);
+        // Bonus
+        const plus = document.createElement('span');
+        plus.className = 'text-gray-500 font-bold self-center';
+        plus.innerText = '+';
+        ballContainer.appendChild(plus);
+
+        const bBall = document.createElement('span');
+        bBall.className = `w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${getBallColorClass(bonus)}`;
+        bBall.innerText = bonus;
+        ballContainer.appendChild(bBall);
+
+        const bLabel = document.createElement('span');
+        bLabel.className = 'text-[10px] text-gray-400 self-end ml-[-40px] mb-[-15px]';
+        // bLabel.innerText = '보너스';
+        // ballContainer.appendChild(bLabel);
     }
 
-    // --- Core Generator ---
+    function getKrRound() {
+        const start = new Date('2002-12-07T20:40:00');
+        const now = new Date();
+        return Math.floor((now - start) / (1000 * 60 * 60 * 24 * 7)) + 1;
+    }
 
-    function getWeightedRandomNumber(excludedNumbers) {
-        let totalWeight = 0;
+    function applyAnalysis(numbers) {
+        const counts = {};
+        numbers.forEach(n => counts[n] = (counts[n] || 0) + 1);
+
+        // Simple Hot/Cold
+        for (let i = 1; i <= 45; i++) {
+            const c = counts[i] || 0;
+            if (c === 0) numberWeights[i] += 2.0; // Cold
+            else if (c >= 3) numberWeights[i] = Math.max(0.1, numberWeights[i] - 0.5); // Hot
+        }
+    }
+
+    // --- Generation Logic ---
+
+    function getWeightedRandom(excluded) {
+        // Fallback
+        if (Object.keys(numberWeights).length === 0) resetWeights();
+
+        let total = 0;
         const candidates = [];
         for (let i = 1; i <= 45; i++) {
-            if (!excludedNumbers.has(i)) {
-                totalWeight += numberWeights[i];
-                candidates.push({ number: i, weight: numberWeights[i] });
+            if (!excluded.has(i)) {
+                const w = numberWeights[i] || 1;
+                total += w;
+                candidates.push({ n: i, w: w });
             }
         }
 
-        if (candidates.length === 0) return 1; // Fallback
+        if (candidates.length === 0) return 1;
 
-        let randomVal = Math.random() * totalWeight;
-        for (const candidate of candidates) {
-            randomVal -= candidate.weight;
-            if (randomVal <= 0) return candidate.number;
+        let r = Math.random() * total;
+        for (const c of candidates) {
+            r -= c.w;
+            if (r <= 0) return c.n;
         }
-        return candidates[candidates.length - 1].number;
+        return candidates[candidates.length - 1].n;
     }
 
-    function generateNumbers() {
-        const selectedNumbers = new Set();
-        // Safety break to prevent infinite loop if something goes wrong
-        let safety = 0;
-        while (selectedNumbers.size < 6 && safety < 100) {
-            selectedNumbers.add(getWeightedRandomNumber(selectedNumbers));
-            safety++;
+    async function runGeneration() {
+        const btn = document.getElementById('generate-btn');
+        if (btn.disabled) return;
+
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+        const sText = document.getElementById('status-text');
+        if (sText) sText.innerText = "AI 알고리즘 가동...";
+        ballContainer.innerHTML = '';
+
+        await delay(500);
+
+        // Generate 6 unique numbers
+        const selected = new Set();
+        while (selected.size < 6) {
+            selected.add(getWeightedRandom(selected));
         }
-        return Array.from(selectedNumbers).sort((a, b) => a - b);
+        const sortedNumbers = Array.from(selected).sort((a,b) => a-b);
+
+        // Animation
+        for (const n of sortedNumbers) {
+            await delay(150);
+            createBall(n);
+        }
+
+        if (sText) sText.innerText = "생성 완료";
+
+        // Save
+        const resultObj = {
+            id: Date.now(),
+            main: sortedNumbers
+        };
+        saveToHistory(resultObj);
+
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+            if (sText) sText.classList.add('opacity-0');
+        }, 1000);
+    }
+
+    function createBall(num) {
+        const ball = document.createElement('div');
+        ball.classList.add('lotto-ball', 'animate-roll', getBallColorClass(num));
+        ball.textContent = num;
+        ballContainer.appendChild(ball);
     }
 
     function getBallColorClass(num) {
@@ -182,210 +256,135 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'ball-range-5';
     }
 
-    async function runGeneration() {
-        if (generateBtn.disabled) return;
-
-        // UI Feedback
-        generateBtn.disabled = true;
-        generateBtn.classList.add('opacity-75', 'cursor-wait');
-        if (statusText) {
-            statusText.classList.remove('opacity-0');
-            statusText.innerText = "가중치 알고리즘 실행 중...";
-        }
-
-        if (ballContainer) ballContainer.innerHTML = '';
-
-        await delay(300);
-        if (statusText) statusText.innerText = "번호 추출 중...";
-        await delay(300);
-
-        const numbers = generateNumbers();
-
-        // Animate balls
-        for (let i = 0; i < numbers.length; i++) {
-            await delay(150);
-            createBallElement(numbers[i]);
-        }
-
-        if (statusText) statusText.innerText = "생성 완료";
-
-        setTimeout(() => {
-            if (statusText) statusText.classList.add('opacity-0');
-            generateBtn.disabled = false;
-            generateBtn.classList.remove('opacity-75', 'cursor-wait');
-        }, 1500);
-
-        saveToHistory(numbers);
-    }
-
-    function createBallElement(num) {
-        if (!ballContainer) return;
-        const ball = document.createElement('div');
-        ball.classList.add('lotto-ball', getBallColorClass(num), 'animate-roll');
-        ball.textContent = num;
-        ballContainer.appendChild(ball);
-    }
-
     // --- Persistence ---
 
-    function loadHistory() {
-        const stored = localStorage.getItem('lottoHistory');
-        if (stored) {
-            try {
-                historyData = JSON.parse(stored);
-                savedCount = historyData.length;
-                if (saveCountBadge) saveCountBadge.textContent = savedCount;
-                renderHistoryUI();
-            } catch (e) {
-                console.error("Corrupt history data", e);
-                localStorage.removeItem('lottoHistory');
-            }
-        }
-    }
-
-    function saveToHistory(numbers) {
-        const entry = { id: Date.now(), numbers: numbers };
-        historyData.unshift(entry);
+    function saveToHistory(obj) {
+        historyData.unshift(obj);
         if (historyData.length > 50) historyData.pop();
-
-        try {
-            localStorage.setItem('lottoHistory', JSON.stringify(historyData));
-        } catch (e) {
-            console.error("LocalStorage full or error", e);
-        }
-
-        savedCount = historyData.length;
-        if (saveCountBadge) saveCountBadge.textContent = savedCount;
-        renderHistoryUI();
-    }
-
-    function removeFromHistory(id) {
-        historyData = historyData.filter(item => item.id !== id);
         localStorage.setItem('lottoHistory', JSON.stringify(historyData));
-        savedCount = historyData.length;
-        if (saveCountBadge) saveCountBadge.textContent = savedCount;
-        renderHistoryUI();
+        renderHistory();
     }
 
-    function renderHistoryUI() {
-        if (!myListContainer) return;
-        myListContainer.innerHTML = '';
+    function loadHistory() {
+        const s = localStorage.getItem('lottoHistory');
+        if (s) {
+            try { historyData = JSON.parse(s); } catch(e){}
+        }
+        // If history format changed (v5 had 'game' field), we can filter or adapt.
+        // For simplicity, we just render what we can.
+        renderHistory();
+    }
 
+    function renderHistory() {
+        const list = document.getElementById('my-numbers-list');
+        const badge = document.getElementById('save-count');
+        if (badge) badge.innerText = historyData.length;
+        if (!list) return;
+
+        list.innerHTML = '';
         if (historyData.length === 0) {
-            myListContainer.innerHTML = `
-                <div class="h-full flex flex-col items-center justify-center text-gray-600 text-sm">
-                    <p>저장된 번호가 없습니다.</p>
-                </div>`;
+            list.innerHTML = '<div class="text-gray-500 text-center text-sm p-4">저장된 기록 없음</div>';
             return;
         }
 
         historyData.forEach(item => {
             const div = document.createElement('div');
-            div.className = 'bg-white/5 p-3 rounded-lg flex justify-between items-center border border-white/5 animate-pop hover:bg-white/10 transition-colors group mb-2';
+            div.className = 'bg-white/5 p-3 rounded-lg flex flex-col gap-2 border border-white/5 hover:bg-white/10 transition-colors text-sm';
 
-            const ballsDiv = document.createElement('div');
-            ballsDiv.className = 'flex gap-2';
+            // Header
+            const head = document.createElement('div');
+            head.className = 'flex justify-between items-center text-xs text-gray-400';
+            head.innerHTML = `<span>${new Date(item.id).toLocaleTimeString()}</span>`;
 
-            item.numbers.forEach(num => {
-                const span = document.createElement('span');
-                span.className = `lotto-ball-sm rounded-full flex items-center justify-center font-bold text-white ${getBallColorClass(num)}`;
-                span.textContent = num;
-                ballsDiv.appendChild(span);
+            // Numbers
+            const numDiv = document.createElement('div');
+            numDiv.className = 'flex flex-wrap gap-1 items-center';
+
+            // Compatibility: item.main exists in v5, item.numbers in v3/4
+            const nums = item.main || item.numbers || [];
+
+            nums.forEach(n => {
+                const s = document.createElement('span');
+                s.className = `w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-sm ${getBallColorClass(n)}`;
+                s.innerText = n;
+                numDiv.appendChild(s);
             });
 
-            const delBtn = document.createElement('button');
-            delBtn.innerHTML = '×';
-            delBtn.className = 'text-gray-400 hover:text-red-400 px-2 text-xl opacity-0 group-hover:opacity-100 transition-opacity';
-            delBtn.onclick = () => removeFromHistory(item.id);
+            div.appendChild(head);
+            div.appendChild(numDiv);
 
-            div.appendChild(ballsDiv);
-            div.appendChild(delBtn);
-            myListContainer.appendChild(div);
+            // Delete button (overlay or corner)
+            const del = document.createElement('button');
+            del.innerHTML = '×';
+            del.className = 'absolute top-1 right-1 text-gray-500 hover:text-red-400 px-2';
+            div.style.position = 'relative';
+            del.onclick = () => removeFromHistory(item.id);
+            div.appendChild(del);
+
+            list.appendChild(div);
         });
     }
 
-    // --- Chart & Utilities ---
+    function removeFromHistory(id) {
+        historyData = historyData.filter(x => x.id !== id);
+        localStorage.setItem('lottoHistory', JSON.stringify(historyData));
+        renderHistory();
+    }
 
+    // --- Chart ---
     function initChart() {
-        const canvas = document.getElementById('statsChart');
-        if (!canvas) {
-            console.warn("Chart canvas not found");
-            return;
-        }
-        if (typeof Chart === 'undefined') {
-            console.error("Chart.js library not loaded");
-            return;
-        }
+        if (!document.getElementById('statsChart')) return;
+        if (typeof Chart === 'undefined') return;
 
-        const ctx = canvas.getContext('2d');
+        const ctx = document.getElementById('statsChart').getContext('2d');
         const labels = Array.from({length: 45}, (_, i) => i + 1);
-        const initialData = Array(45).fill(0);
 
         statsChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: '최근 10회차 출현 빈도',
-                    data: initialData,
-                    backgroundColor: 'rgba(0, 243, 255, 0.5)',
-                    borderColor: '#00f3ff',
-                    borderWidth: 1,
-                    borderRadius: 3
+                    label: '빈도수',
+                    data: Array(45).fill(0),
+                    backgroundColor: '#00f3ff',
+                    borderRadius: 2
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        ticks: { stepSize: 1, color: '#9ca3af' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#9ca3af', font: {size: 10}, maxRotation: 0, autoSkip: true }
-                    }
+                    x: { ticks: { color: '#666', autoSkip: true, maxTicksLimit: 20 }, grid: { display: false } },
+                    y: { ticks: { color: '#666' }, grid: { color: '#333' } }
                 },
-                plugins: {
-                    legend: { display: true, labels: { color: '#ccc' } },
-                    tooltip: { mode: 'index', intersect: false }
-                }
+                plugins: { legend: { display: false } }
             }
         });
     }
 
-    function updateChartWithRealData(numbers) {
+    function updateChartData(numbers) {
         if (!statsChart) return;
-
         const counts = Array(45).fill(0);
-        numbers.forEach(num => {
-            if (num >= 1 && num <= 45) counts[num - 1]++;
+        numbers.forEach(n => {
+            if (n >= 1 && n <= 45) counts[n-1]++;
         });
-
         statsChart.data.datasets[0].data = counts;
         statsChart.update();
     }
 
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     function copyToClipboard() {
-        if (historyData.length === 0) {
-            alert('저장된 번호가 없습니다.');
-            return;
-        }
+        if (historyData.length === 0) return;
+        const text = historyData.map((h, i) => {
+            const nums = h.main || h.numbers || [];
+            return `[${i+1}] ${nums.join(', ')}`;
+        }).join('\n');
 
-        const textToCopy = historyData.map((item, idx) => `[${idx+1}] ` + item.numbers.join(', ')).join('\n');
-
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            const originalText = copyBtn.innerText;
-            copyBtn.innerText = 'Copied!';
-            setTimeout(() => copyBtn.innerText = originalText, 2000);
-        }).catch(err => {
-            console.error('Copy failed', err);
-        });
+        navigator.clipboard.writeText(text);
+        const btn = document.getElementById('copy-btn');
+        const origin = btn.innerText;
+        btn.innerText = "복사 완료!";
+        setTimeout(()=>btn.innerText = origin, 2000);
     }
 });
